@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Neon Shooting Game</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: black;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+let score = 0;
+let lives = 3;
+let gameOver = false;
+
+const keys = {
+  left: false,
+  right: false,
+  shoot: false
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+  if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+  if (e.key === ' ') keys.shoot = true;
+  if (e.key === 'r' && gameOver) restartGame();
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+  if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+  if (e.key === ' ') keys.shoot = false;
+});
+
+// --- PLAYER WITH ROTATION ---
+class Player {
+  constructor() {
+    this.width = 40;
+    this.height = 40;
+    this.x = canvas.width / 2;
+    this.y = canvas.height - 50;
+    this.speed = 5;
+    this.color = '#00ffff';
+    this.cooldown = 0;
+    this.rotation = 0;
+    this.targetRotation = 0;
+  }
+
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+    ctx.beginPath();
+    ctx.moveTo(0, 0); // tip
+    ctx.lineTo(-this.width / 2, this.height); // bottom left
+    ctx.lineTo(this.width / 2, this.height);  // bottom right
+    ctx.closePath();
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  update() {
+    if (keys.left && this.x - this.width / 2 > 0) {
+      this.x -= this.speed;
+      this.targetRotation = -0.3;
+    } else if (keys.right && this.x + this.width / 2 < canvas.width) {
+      this.x += this.speed;
+      this.targetRotation = 0.3;
+    } else {
+      this.targetRotation = 0;
+    }
+
+    this.rotation += (this.targetRotation - this.rotation) * 0.1;
+
+    if (keys.shoot && this.cooldown <= 0) {
+      bullets.push(new Bullet(this.x, this.y));
+      this.cooldown = 15;
+    }
+
+    if (this.cooldown > 0) this.cooldown--;
+    this.draw();
+  }
+}
+
+// BULLET
+class Bullet {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 4;
+    this.color = '#ff00ff';
+    this.speed = 7;
+  }
+
+  draw() {
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.closePath();
+    ctx.shadowBlur = 0;
+  }
+
+  update() {
+    this.y -= this.speed;
+    this.draw();
+  }
+}
+
+// --- ROTATING ENEMY ("AMI") ---
+class Enemy {
+  constructor(x, y) {
+    this.size = 20;
+    this.x = x;
+    this.y = y;
+    this.speed = 2;
+    this.color = '#ff0033';
+    this.rotation = 0;
+    this.rotationSpeed = (Math.random() * 0.05) + 0.01;
+  }
+
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = this.color;
+    ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  update() {
+    this.y += this.speed;
+    this.rotation += this.rotationSpeed;
+    this.draw();
+  }
+
+  getBounds() {
+    return {
+      x: this.x - this.size / Math.SQRT2 / 2,
+      y: this.y - this.size / Math.SQRT2 / 2,
+      width: this.size / Math.SQRT2,
+      height: this.size / Math.SQRT2
+    };
+  }
+}
+
+// GAME OBJECTS
+const player = new Player();
+let bullets = [];
+let enemies = [];
+
+// SPAWN ENEMIES
+function spawnEnemy() {
+  if (!gameOver) {
+    const x = Math.random() * (canvas.width - 40) + 20;
+    enemies.push(new Enemy(x, -30));
+  }
+}
+
+// HUD
+function drawHUD() {
+  ctx.shadowColor = '#0ff';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = '#0ff';
+  ctx.font = '24px monospace';
+  ctx.fillText(`Score: ${score}`, 20, 40);
+  ctx.fillText(`Lives: ${lives}`, 20, 70);
+  ctx.shadowBlur = 0;
+}
+
+// GAME OVER
+function drawGameOver() {
+  ctx.fillStyle = '#f00';
+  ctx.shadowColor = '#f00';
+  ctx.shadowBlur = 30;
+  ctx.font = '48px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+  ctx.font = '24px monospace';
+  ctx.fillText("Press 'R' to restart", canvas.width / 2, canvas.height / 2 + 40);
+  ctx.shadowBlur = 0;
+}
+
+// RESTART
+function restartGame() {
+  score = 0;
+  lives = 3;
+  gameOver = false;
+  bullets = [];
+  enemies = [];
+  animate();
+}
+
+// MAIN LOOP
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (gameOver) {
+    drawGameOver();
+    return;
+  }
+
+  player.update();
+
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    bullets[i].update();
+    if (bullets[i].y < 0) bullets.splice(i, 1);
+  }
+
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const enemy = enemies[i];
+    enemy.update();
+
+    if (enemy.y > canvas.height) {
+      enemies.splice(i, 1);
+      lives -= 1;
+      if (lives <= 0) {
+        gameOver = true;
+        return;
+      }
+      continue;
+    }
+
+    const { x, y, width, height } = enemy.getBounds();
+    for (let j = bullets.length - 1; j >= 0; j--) {
+      const bullet = bullets[j];
+      const hit = bullet.x + bullet.radius > x &&
+                  bullet.x - bullet.radius < x + width &&
+                  bullet.y + bullet.radius > y &&
+                  bullet.y - bullet.radius < y + height;
+      if (hit) {
+        enemies.splice(i, 1);
+        bullets.splice(j, 1);
+        score += 100;
+        break;
+      }
+    }
+  }
+
+  drawHUD();
+  requestAnimationFrame(animate);
+}
+
+setInterval(spawnEnemy, 1000);
+animate();
+</script>
+</body>
+</html>
