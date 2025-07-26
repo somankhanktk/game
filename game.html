@@ -27,7 +27,7 @@ canvas.width = innerWidth;
 canvas.height = innerHeight;
 
 let score = 0;
-let lives = 3;
+let lives = 10;
 let gameOver = false;
 
 const keys = {
@@ -48,7 +48,41 @@ document.addEventListener('keyup', e => {
   if (e.key === ' ') keys.shoot = false;
 });
 
-// --- PLAYER WITH ROTATION ---
+let buttons = {
+  restart: { x: 0, y: 0, width: 200, height: 50 },
+  quit: { x: 0, y: 0, width: 200, height: 50 }
+};
+
+canvas.addEventListener('click', (e) => {
+  if (!gameOver) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  if (
+    mx >= buttons.restart.x &&
+    mx <= buttons.restart.x + buttons.restart.width &&
+    my >= buttons.restart.y &&
+    my <= buttons.restart.y + buttons.restart.height
+  ) {
+    restartGame();
+  }
+
+  if (
+    mx >= buttons.quit.x &&
+    mx <= buttons.quit.x + buttons.quit.width &&
+    my >= buttons.quit.y &&
+    my <= buttons.quit.y + buttons.quit.height
+  ) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fff';
+    ctx.font = '30px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText("Thanks for playing!", canvas.width / 2, canvas.height / 2);
+  }
+});
+
 class Player {
   constructor() {
     this.width = 40;
@@ -67,9 +101,9 @@ class Player {
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
     ctx.beginPath();
-    ctx.moveTo(0, 0); // tip
-    ctx.lineTo(-this.width / 2, this.height); // bottom left
-    ctx.lineTo(this.width / 2, this.height);  // bottom right
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-this.width / 2, this.height);
+    ctx.lineTo(this.width / 2, this.height);
     ctx.closePath();
     ctx.shadowColor = this.color;
     ctx.shadowBlur = 20;
@@ -93,7 +127,7 @@ class Player {
 
     if (keys.shoot && this.cooldown <= 0) {
       bullets.push(new Bullet(this.x, this.y));
-      this.cooldown = 15;
+      this.cooldown = 2; // Faster shooting
     }
 
     if (this.cooldown > 0) this.cooldown--;
@@ -101,14 +135,13 @@ class Player {
   }
 }
 
-// BULLET
 class Bullet {
   constructor(x, y) {
     this.x = x;
     this.y = y;
     this.radius = 4;
     this.color = '#ff00ff';
-    this.speed = 7;
+    this.speed = 12; // Faster bullet speed
   }
 
   draw() {
@@ -128,7 +161,6 @@ class Bullet {
   }
 }
 
-// --- ROTATING ENEMY ("AMI") ---
 class Enemy {
   constructor(x, y) {
     this.size = 20;
@@ -168,12 +200,10 @@ class Enemy {
   }
 }
 
-// GAME OBJECTS
 const player = new Player();
 let bullets = [];
 let enemies = [];
 
-// SPAWN ENEMIES
 function spawnEnemy() {
   if (!gameOver) {
     const x = Math.random() * (canvas.width - 40) + 20;
@@ -181,7 +211,6 @@ function spawnEnemy() {
   }
 }
 
-// HUD
 function drawHUD() {
   ctx.shadowColor = '#0ff';
   ctx.shadowBlur = 20;
@@ -192,76 +221,89 @@ function drawHUD() {
   ctx.shadowBlur = 0;
 }
 
-// GAME OVER
 function drawGameOver() {
   ctx.fillStyle = '#f00';
   ctx.shadowColor = '#f00';
   ctx.shadowBlur = 30;
   ctx.font = '48px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
-  ctx.font = '24px monospace';
-  ctx.fillText("Press 'R' to restart", canvas.width / 2, canvas.height / 2 + 40);
+  ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 80);
   ctx.shadowBlur = 0;
+
+  // Restart Button
+  buttons.restart.x = canvas.width / 2 - 100;
+  buttons.restart.y = canvas.height / 2 - 20;
+
+  ctx.fillStyle = '#0ff';
+  ctx.fillRect(buttons.restart.x, buttons.restart.y, buttons.restart.width, buttons.restart.height);
+  ctx.fillStyle = '#000';
+  ctx.font = '24px monospace';
+  ctx.fillText("RESTART", canvas.width / 2, canvas.height / 2 + 15);
+
+  // Quit Button
+  buttons.quit.x = canvas.width / 2 - 100;
+  buttons.quit.y = canvas.height / 2 + 50;
+
+  ctx.fillStyle = '#f0f';
+  ctx.fillRect(buttons.quit.x, buttons.quit.y, buttons.quit.width, buttons.quit.height);
+  ctx.fillStyle = '#000';
+  ctx.fillText("QUIT", canvas.width / 2, canvas.height / 2 + 85);
 }
 
-// RESTART
 function restartGame() {
   score = 0;
-  lives = 3;
+  lives = 10;
   gameOver = false;
   bullets = [];
   enemies = [];
-  animate();
+  player.x = canvas.width / 2;
 }
 
-// MAIN LOOP
 function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (gameOver) {
-    drawGameOver();
-    return;
-  }
+  if (!gameOver) {
+    player.update();
 
-  player.update();
-
-  for (let i = bullets.length - 1; i >= 0; i--) {
-    bullets[i].update();
-    if (bullets[i].y < 0) bullets.splice(i, 1);
-  }
-
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    const enemy = enemies[i];
-    enemy.update();
-
-    if (enemy.y > canvas.height) {
-      enemies.splice(i, 1);
-      lives -= 1;
-      if (lives <= 0) {
-        gameOver = true;
-        return;
-      }
-      continue;
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      bullets[i].update();
+      if (bullets[i].y < 0) bullets.splice(i, 1);
     }
 
-    const { x, y, width, height } = enemy.getBounds();
-    for (let j = bullets.length - 1; j >= 0; j--) {
-      const bullet = bullets[j];
-      const hit = bullet.x + bullet.radius > x &&
-                  bullet.x - bullet.radius < x + width &&
-                  bullet.y + bullet.radius > y &&
-                  bullet.y - bullet.radius < y + height;
-      if (hit) {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const enemy = enemies[i];
+      enemy.update();
+
+      if (enemy.y > canvas.height) {
         enemies.splice(i, 1);
-        bullets.splice(j, 1);
-        score += 100;
-        break;
+        lives -= 1;
+        if (lives <= 0) {
+          gameOver = true;
+        }
+        continue;
+      }
+
+      const { x, y, width, height } = enemy.getBounds();
+      for (let j = bullets.length - 1; j >= 0; j--) {
+        const bullet = bullets[j];
+        const hit = bullet.x + bullet.radius > x &&
+                    bullet.x - bullet.radius < x + width &&
+                    bullet.y + bullet.radius > y &&
+                    bullet.y - bullet.radius < y + height;
+        if (hit) {
+          enemies.splice(i, 1);
+          bullets.splice(j, 1);
+          score += 100;
+          break;
+        }
       }
     }
+
+    drawHUD();
+  } else {
+    drawGameOver();
   }
 
-  drawHUD();
   requestAnimationFrame(animate);
 }
 
